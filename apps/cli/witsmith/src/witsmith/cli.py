@@ -10,16 +10,23 @@ import sys
 from pathlib import Path
 
 from witsmith import __version__
-from witsmith.amend_service import apply_demo_path_rules, propose_amendment_diff
+from witsmith.amend_service import apply_demo_path_rules, propose_contract_amendment
 from witsmith.analyze_service import analyze_log_event, write_handoff
 from witsmith.check_service import run_wit_check
 from witsmith.clod import DEFAULT_BASE_URL, DEFAULT_MODEL, model
 from witsmith.config import witsmith_data_dirname
+from witsmith.contracts import parse_evidence_bundle, to_contract_decision, to_contract_event
 from witsmith.layout import find_wit_file
 from witsmith.models import Action, CheckResult
 from witsmith.replay import append_event, new_action_id, read_last_deny, utc_now_iso
 from witsmith.scaffold_docs import ensure_hackathon_docs
-from witsmith.wit_file import wit_yaml_text
+from witsmith.session import (
+    cmd_context,
+    cmd_finish,
+    cmd_init,
+    cmd_stale_check,
+    cmd_start,
+)
 
 
 def _print_verdict(result: CheckResult, source: str | None) -> None:
@@ -44,6 +51,30 @@ def _require_wit(start: Path) -> Path:
     return wit
 
 
+def _print_json(payload: dict) -> None:
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
+
+
+def _run_payload(result: CheckResult, action: Action, log_event: dict, meta: dict) -> dict:
+    return {
+        "decision": to_contract_decision(result, action).model_dump(mode="json"),
+        "event": to_contract_event(log_event).model_dump(mode="json"),
+        "_witsmith": {
+            "meta": meta,
+            "action_id": log_event.get("action_id"),
+        },
+    }
+
+
+def _load_evidence_bundle(path_text: str):
+    path_text = path_text.strip()
+    if not path_text:
+        return None
+    path = Path(path_text).expanduser().resolve()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return parse_evidence_bundle(data)
+
+
 def cmd_run(ns: argparse.Namespace) -> int:
     command = ns.shell_cmd.strip()
     if not command:
@@ -55,9 +86,10 @@ def cmd_run(ns: argparse.Namespace) -> int:
     dirname = witsmith_data_dirname()
     source = ns.source
 
-    action = Action(command=command, cwd=str(cwd), source=source)
+    action = Action(command=command, cwd=str(cwd), session_id=ns.session_id, source=source)
     result, meta = run_wit_check(action, wit_path, use_cache=not ns.no_cache)
-    _print_verdict(result, source)
+    if not ns.emit_json:
+        _print_verdict(result, source)
 
     action_id = new_action_id()
     base_log = {
@@ -66,6 +98,7 @@ def cmd_run(ns: argparse.Namespace) -> int:
         "command": command,
         "cwd": str(cwd),
         "source": source,
+        "session_id": ns.session_id,
         "decision": result.decision,
         "reason": result.reason,
         "matched_rule": result.matched_rule,
@@ -79,12 +112,16 @@ def cmd_run(ns: argparse.Namespace) -> int:
 
     if result.decision == "deny":
         append_event(repo_root, dirname, base_log)
+        if ns.emit_json:
+            _print_json(_run_payload(result, action, base_log, meta))
         return 2
 
     if result.decision == "ask":
         # Verdict-only runs should not block on stdin (CI / `--no-exec` demos).
         if ns.no_exec:
             append_event(repo_root, dirname, base_log)
+            if ns.emit_json:
+                _print_json(_run_payload(result, action, base_log, meta))
             return 0
         if ns.yes:
             answer = "y"
@@ -95,10 +132,14 @@ def cmd_run(ns: argparse.Namespace) -> int:
                 answer = "n"
         if answer not in {"y", "yes"}:
             append_event(repo_root, dirname, base_log)
+            if ns.emit_json:
+                _print_json(_run_payload(result, action, base_log, meta))
             return 1
 
     if ns.no_exec:
         append_event(repo_root, dirname, base_log)
+        if ns.emit_json:
+            _print_json(_run_payload(result, action, base_log, meta))
         return 0
 
     proc = subprocess.run(
@@ -112,9 +153,11 @@ def cmd_run(ns: argparse.Namespace) -> int:
     base_log["stdout"] = proc.stdout[-8000:]
     base_log["stderr"] = proc.stderr[-8000:]
     append_event(repo_root, dirname, base_log)
-    if proc.stdout:
+    if ns.emit_json:
+        _print_json(_run_payload(result, action, base_log, meta))
+    elif proc.stdout:
         sys.stdout.write(proc.stdout)
-    if proc.stderr:
+    if not ns.emit_json and proc.stderr:
         sys.stderr.write(proc.stderr)
     return proc.returncode
 
@@ -131,9 +174,17 @@ def cmd_amend(ns: argparse.Namespace) -> int:
     if last is None:
         print("witsmith amend: no deny events in the replay log yet.", file=sys.stderr)
         return 4
-    yml = wit_yaml_text(wit_path)
-    diff = propose_amendment_diff(yml, last)
-    print(diff)
+    evidence_bundle = _load_evidence_bundle(ns.evidence_file) if ns.evidence_file else None
+    amendment = propose_contract_amendment(
+        wit_path,
+        last,
+        evidence_bundle=evidence_bundle,
+        session_id=ns.session_id,
+    )
+    if ns.emit_json:
+        _print_json(amendment.model_dump(mode="json"))
+    else:
+        print(amendment.diff)
     if ns.apply:
         if not ns.yes:
             try:
@@ -144,7 +195,8 @@ def cmd_amend(ns: argparse.Namespace) -> int:
                 print("Aborted.")
                 return 0
         apply_demo_path_rules(wit_path, last)
-        print(f"Updated {wit_path}")
+        if not ns.emit_json:
+            print(f"Updated {wit_path}")
     return 0
 
 
@@ -206,6 +258,23 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="witsmith", description="Agent permission checks + replay log.")
     sub = p.add_subparsers(dest="cmd")
 
+    pi = sub.add_parser("init", help="Initialize Witsmith runtime files")
+    pi.add_argument("--cwd", default=".", help="Repo/project root to initialize")
+
+    pst = sub.add_parser("start", help="Start a Witsmith recording session")
+    pst.add_argument("task", help="Task description for this session")
+    pst.add_argument("--cwd", default=".", help="Repo/project root for the session")
+
+    pf = sub.add_parser("finish", help="Finish the active Witsmith recording session")
+    pf.add_argument("--cwd", default=".", help="Repo/project root for the session")
+
+    pc = sub.add_parser("context", help="Write relevant memory context for a new task")
+    pc.add_argument("task", help="Next task to retrieve context for")
+    pc.add_argument("--cwd", default=".", help="Repo/project root to read sessions from")
+
+    pscq = sub.add_parser("stale-check", help="Count memory cards; hash stale-check comes later")
+    pscq.add_argument("--cwd", default=".", help="Repo/project root to read sessions from")
+
     pr = sub.add_parser("run", help="wit_check → optional execute")
     pr.add_argument(
         "shell_cmd",
@@ -217,6 +286,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="user",
         help='Provenance label, e.g. "RECENT_NOTES.md"',
     )
+    pr.add_argument("--session-id", default="", help="Blackbox session id for replay events")
+    pr.add_argument(
+        "--emit-json",
+        action="store_true",
+        help="Emit ContractDecision + ContractEvent JSON for programmatic callers",
+    )
     pr.add_argument("--no-cache", action="store_true", help="Bypass the SQLite verdict cache")
     pr.add_argument("--no-exec", action="store_true", help="Print verdict only; never run the shell")
     pr.add_argument("-y", "--yes", action="store_true", help="Auto-confirm ASK prompts (demo mode)")
@@ -226,6 +301,17 @@ def build_parser() -> argparse.ArgumentParser:
     pa.add_argument("--apply", action="store_true", help="Append hardened path rules to AGENT_WIT.yaml")
     pa.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompts")
     pa.add_argument("--cwd", default=".", help="Where to look for AGENT_WIT.yaml")
+    pa.add_argument("--session-id", default="", help="Blackbox session id for the amendment")
+    pa.add_argument(
+        "--evidence-file",
+        default="",
+        help="Path to a SessionFile or EvidenceBundle JSON to use as amendment evidence",
+    )
+    pa.add_argument(
+        "--emit-json",
+        action="store_true",
+        help="Emit ContractAmendment JSON instead of the human diff",
+    )
 
     prs = sub.add_parser("rescue", help="Self-Rescue analysis for the last deny")
     prs.add_argument("--last", action="store_true", help="Analyze the latest deny event")
@@ -264,6 +350,16 @@ def main(argv: list[str] | None = None) -> int:
     if ns.cmd is None:
         parser.print_help()
         return 0
+    if ns.cmd == "init":
+        return cmd_init(ns.cwd)
+    if ns.cmd == "start":
+        return cmd_start(ns.task, ns.cwd)
+    if ns.cmd == "finish":
+        return cmd_finish(ns.cwd)
+    if ns.cmd == "context":
+        return cmd_context(ns.task, ns.cwd)
+    if ns.cmd == "stale-check":
+        return cmd_stale_check(ns.cwd)
     if ns.cmd == "run":
         return cmd_run(ns)
     if ns.cmd == "amend":

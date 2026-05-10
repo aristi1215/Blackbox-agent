@@ -240,6 +240,7 @@ Core work:
 - Store memory cards and source file hashes in SQLite when available.
 - Start with keyword retrieval for MVP.
 - Add stale detection by comparing current file hashes against stored memory source hashes.
+- Own the TypeScript/Prisma import layer that reads `.witsmith/sessions/<session_id>.json` and persists sessions, actions, memories, and source hashes.
 
 Sponsor priority:
 
@@ -253,6 +254,7 @@ Deliverables:
 - Generated memory cards.
 - Non-stale context block output.
 - Stored memory cards in SQLite or JSON-backed MVP.
+- Session JSON importer into SQLite/Prisma.
 - Optional sponsor-enriched memory metadata.
 
 Async boundary:
@@ -372,6 +374,145 @@ Use memory cards shaped like:
 }
 ```
 
+## SQLite / Prisma Boundary
+
+Keep the Python Witsmith CLI as the source of truth for local capture. It writes `.witsmith/log.jsonl` and `.witsmith/sessions/<session_id>.json`.
+
+Use TypeScript/Prisma as the application data layer for Nour and Juan. The recommended flow is:
+
+```text
+Python Witsmith CLI
+  -> writes .witsmith/sessions/<session_id>.json
+  -> TypeScript importer reads session JSON
+  -> Prisma writes SQLite
+  -> Nour generates and stores memory cards
+  -> Juan dashboard reads from API/Prisma-backed data
+```
+
+Do not make the Python CLI depend on Prisma for the MVP. The CLI should remain useful even if the database layer is not running.
+
+Recommended Prisma schema draft:
+
+```prisma
+model Session {
+  id           String   @id
+  task         String
+  repoPath     String
+  branch       String?
+  baseCommit   String?
+  endCommit    String?
+  startedAt    DateTime
+  finishedAt   DateTime?
+  changedFiles Json
+  diff         String?
+  agentTrace   String?
+  createdAt    DateTime @default(now())
+
+  actions      CommandAction[]
+  memories     MemoryCard[]
+}
+
+model CommandAction {
+  id          String   @id
+  sessionId   String
+  timestamp   DateTime?
+  command     String
+  cwd         String?
+  source      String?
+  decision    String
+  reason      String?
+  matchedRule String?
+  confidence  Float?
+  cacheHit    Boolean  @default(false)
+  executed    Boolean  @default(false)
+  exitCode    Int?
+  stdout      String?
+  stderr      String?
+  createdAt   DateTime @default(now())
+
+  session     Session  @relation(fields: [sessionId], references: [id])
+}
+
+model MemoryCard {
+  id             String   @id
+  sessionId      String
+  type           String
+  claimType      String
+  content        String
+  evidence       Json
+  sourceFiles    Json
+  confidence     String
+  retrieveWhen   Json
+  staleIfChanged Json
+  isStale        Boolean  @default(false)
+  generatedBy    String?
+  retrievedBy    String?
+  reviewedBy     String?
+  createdAt      DateTime @default(now())
+
+  session        Session  @relation(fields: [sessionId], references: [id])
+  sourceHashes   MemorySourceHash[]
+}
+
+model MemorySourceHash {
+  id        String     @id
+  memoryId  String
+  filePath  String
+  hash      String
+  createdAt DateTime   @default(now())
+
+  memory    MemoryCard @relation(fields: [memoryId], references: [id])
+}
+```
+
+Nour can start with this importer contract:
+
+```ts
+type ImportSessionResult = {
+  sessionId: string;
+  actionCount: number;
+  memoryCount: number;
+};
+
+async function importWitsmithSession(path: string): Promise<ImportSessionResult>;
+async function generateMemories(sessionId: string): Promise<void>;
+async function getContextForTask(task: string): Promise<string>;
+async function runStaleCheck(): Promise<void>;
+```
+
+Juan can build against mocked API responses shaped around:
+
+```ts
+type DashboardSession = {
+  id: string;
+  task: string;
+  branch?: string;
+  startedAt: string;
+  finishedAt?: string;
+  changedFiles: string[];
+  actions: CommandAction[];
+  memories: MemoryCard[];
+};
+```
+
+## What To Share With Nour And Juan
+
+Share this with Nour:
+
+```text
+The Python Witsmith CLI is staying as the local recorder/gatekeeper. Your layer should consume `.witsmith/sessions/<session_id>.json`, import it into SQLite with Prisma, generate memory cards, store source file hashes, retrieve context for a new task, and mark memories stale when source hashes change.
+
+Start with a mocked session JSON if the CLI output is not ready. Use CLōD for memory generation first. Nia and Greptile can be added as optional enrichments after the JSON/import path works.
+```
+
+Share this with Juan:
+
+```text
+Build the dashboard against mocked session and memory data first. The real data source will be `.witsmith/sessions/<session_id>.json` imported into SQLite/Prisma by Nour's layer. The dashboard should show session timeline, changed files, git diff, command results, Witsmith decisions, memory cards, stale warnings, and next-run context.
+
+Do not call sponsor APIs directly from the dashboard. Display sponsor metadata if it exists, such as `generatedBy: "CLōD"`, `retrievedBy: "Nia"`, or `reviewedBy: "Greptile"`.
+```
+
 ## MVP Priority
 
 1. Fix Witsmith packaging by adding `apps/cli/witsmith/README.md`.
@@ -379,8 +520,9 @@ Use memory cards shaped like:
 3. Produce stable `.witsmith/sessions/<session_id>.json`.
 4. Create a demo session JSON for Nour and Juan.
 5. Add simple `context` and `stale-check`.
-6. Add SQLite/Prisma only after the JSON artifact is stable.
-7. Keep sponsor integrations and dashboard polish decoupled through the shared JSON/database shape.
+6. Define the SQLite/Prisma import contract around session JSON.
+7. Add SQLite/Prisma implementation only after the JSON artifact is stable.
+8. Keep sponsor integrations and dashboard polish decoupled through the shared JSON/database shape.
 
 ## Do Not Build Yet
 
