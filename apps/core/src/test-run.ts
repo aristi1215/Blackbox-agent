@@ -7,12 +7,12 @@ import { importSession } from "./db/importSession";
 import { getContextForTask } from "./memory/getContextForTask";
 import { runStaleCheck } from "./memory/runStaleCheck";
 
-const MOCK_SESSION = path.resolve(__dirname, "../mock/session.example.json");
-const WITSMITH_DIR = path.resolve(__dirname, "../mock");
+const REAL_SESSION = process.argv[2] ?? path.resolve(__dirname, "../mock/session.example.json");
+const WITSMITH_DIR = process.argv[3] ?? path.resolve(__dirname, "../mock");
 
 async function main() {
-  console.log("--- Step 1: Import mock session ---");
-  const cards = await importSession(MOCK_SESSION);
+  console.log("--- Step 1: Import real CLI session ---");
+  const cards = await importSession(REAL_SESSION);
   console.log(`Generated ${cards.length} memory card(s):`);
   for (const card of cards) {
     console.log(`  [${card.type}] ${card.content.slice(0, 80)}...`);
