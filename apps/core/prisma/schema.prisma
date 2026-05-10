@@ -46,6 +46,16 @@ model MemoryCard {
   createdAt      DateTime
 }
 
+model LlmCache {
+  id        String   @id @default(cuid())
+  key       String   @unique  // SHA256 of model+prompt
+  model     String
+  response  String
+  hitCount  Int      @default(0)
+  createdAt DateTime @default(now())
+  lastHitAt DateTime @default(now())
+}
+
 model SourceFileHash {
   id        String   @id @default(cuid())
   sessionId String

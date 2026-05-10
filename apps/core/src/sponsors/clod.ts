@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { EvidenceBundle, Claim, MemoryCard } from "../types";
+import { getCached, setCached } from "../db/llmCache";
 
 const clod = new OpenAI({
   apiKey: process.env.CLOD_API_KEY,
@@ -10,12 +11,20 @@ const FAST_MODEL = process.env.CLOD_FREE_MODEL ?? "claude-haiku-4-5";
 const STRUCTURED_MODEL = process.env.CLOD_STRUCTURED_MODEL ?? "claude-haiku-4-5";
 
 async function complete(model: string, prompt: string, maxTokens: number): Promise<string> {
+  const cached = await getCached(model, prompt);
+  if (cached) {
+    console.log(`  [cache] hit — ${model}`);
+    return cached;
+  }
+
   const res = await clod.chat.completions.create({
     model,
     max_tokens: maxTokens,
     messages: [{ role: "user", content: prompt }],
   });
-  return res.choices[0]?.message?.content?.trim() ?? "";
+  const text = res.choices[0]?.message?.content?.trim() ?? "";
+  await setCached(model, prompt, text);
+  return text;
 }
 
 export async function summarizeWithClod(bundle: EvidenceBundle, handoffs: string[] = []): Promise<string> {
