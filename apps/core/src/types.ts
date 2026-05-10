@@ -26,7 +26,8 @@ export type SessionRecord = {
 };
 
 export type EvidenceBundle = {
-  sessionId: string;
+  id: string;        // CLI field name
+  sessionId?: string; // alias kept for backwards compatibility
   task: string;
   repoPath: string;
   branch: string;

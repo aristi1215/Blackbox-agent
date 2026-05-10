@@ -102,8 +102,8 @@ Respond with only the JSON array.`;
 
   return parsed.map((card, i) => ({
     ...card,
-    id: `memory_${bundle.sessionId}_${i}`,
-    sessionId: bundle.sessionId,
+    id: `memory_${(bundle.id ?? bundle.sessionId!)}_${i}`,
+    sessionId: (bundle.id ?? bundle.sessionId!),
     isStale: false,
     createdAt: new Date().toISOString(),
   }));

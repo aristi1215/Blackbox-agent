@@ -1,6 +1,6 @@
 {
   "evidenceBundle": {
-    "sessionId": "session_001",
+    "id": "session_001",
     "task": "Fix OAuth redirect bug",
     "repoPath": "./mock",
     "branch": "main",

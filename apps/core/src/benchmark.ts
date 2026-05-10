@@ -168,10 +168,10 @@ async function main() {
   // ── Step 8: Store in SQLite ───────────────────────────────────────────────
   const { ms: dbMs } = await time(async () => {
     await prisma.session.upsert({
-      where: { id: bundle.sessionId },
+      where: { id: (bundle.id ?? bundle.sessionId!) },
       update: {},
       create: {
-        id: bundle.sessionId,
+        id: (bundle.id ?? bundle.sessionId!),
         task: bundle.task,
         repoPath: bundle.repoPath,
         branch: bundle.branch,
@@ -192,7 +192,7 @@ async function main() {
         update: { isStale: card.isStale },
         create: {
           id: card.id,
-          sessionId: bundle.sessionId,
+          sessionId: (bundle.id ?? bundle.sessionId!),
           type: card.type,
           claimType: card.claimType,
           content: card.content,

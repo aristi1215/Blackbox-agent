@@ -43,10 +43,10 @@ export async function importSession(sessionJsonPath: string): Promise<MemoryCard
 
   // upsert session row
   await prisma.session.upsert({
-    where: { id: bundle.sessionId },
+    where: { id: (bundle.id ?? bundle.sessionId!) },
     update: {},
     create: {
-      id: bundle.sessionId,
+      id: (bundle.id ?? bundle.sessionId!),
       task: bundle.task,
       repoPath: bundle.repoPath,
       branch: bundle.branch,
@@ -72,7 +72,7 @@ export async function importSession(sessionJsonPath: string): Promise<MemoryCard
       update: { isStale: card.isStale },
       create: {
         id: card.id,
-        sessionId: bundle.sessionId,
+        sessionId: (bundle.id ?? bundle.sessionId!),
         type: card.type,
         claimType: card.claimType,
         content: card.content,
@@ -98,9 +98,9 @@ export async function importSession(sessionJsonPath: string): Promise<MemoryCard
     if (!hash) continue;
 
     await prisma.sourceFileHash.upsert({
-      where: { sessionId_filePath: { sessionId: bundle.sessionId, filePath: relPath } },
+      where: { sessionId_filePath: { sessionId: (bundle.id ?? bundle.sessionId!), filePath: relPath } },
       update: { hash },
-      create: { sessionId: bundle.sessionId, filePath: relPath, hash },
+      create: { sessionId: (bundle.id ?? bundle.sessionId!), filePath: relPath, hash },
     });
   }
 

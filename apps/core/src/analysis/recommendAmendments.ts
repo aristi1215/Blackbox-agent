@@ -31,7 +31,7 @@ export function recommendAmendments(bundle: EvidenceBundle): ContractAmendment[]
       if (pattern.test(action.command)) {
         amendments.push({
           id: `amendment_${Date.now()}_${rule}`,
-          sessionId: bundle.sessionId,
+          sessionId: (bundle.id ?? bundle.sessionId!),
           filePath: ".witsmith/AGENT_WIT.yaml",
           diff: `+ ask:\n+   - pattern: "${action.command}"`,
           reason,

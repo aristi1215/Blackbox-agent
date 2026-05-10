@@ -31,7 +31,7 @@ export async function analyzeBundle(
   const memoryCards = await generateMemoryCards(enrichedBundle, allClaims, summary, handoffs);
 
   return {
-    sessionId: bundle.sessionId,
+    sessionId: (bundle.id ?? bundle.sessionId!),
     summary,
     observedFacts,
     agentReportedClaims,
