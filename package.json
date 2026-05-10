@@ -1,14 +1,14 @@
 {
   "name": "blackbox-agent",
   "version": "1.0.0",
-  "description": "",
+  "description": "Vancouver Cursor Hackathon 2026 — apps/* + witsmith/",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aristi1215/Blackbox-agent.git"
+    "url": "git+https://github.com/yaoDu/Blackbox-agent.git"
   },
   "workspaces": [
     "apps/*"
@@ -18,7 +18,7 @@
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/aristi1215/Blackbox-agent/issues"
+    "url": "https://github.com/yaoDu/Blackbox-agent/issues"
   },
-  "homepage": "https://github.com/aristi1215/Blackbox-agent#readme"
+  "homepage": "https://github.com/yaoDu/Blackbox-agent#readme"
 }

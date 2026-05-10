@@ -1,0 +1,15 @@
+// Final schema after init + 0042-style migration (email column dropped).
+// API route still queries `email` — backup demo: tests fail after `prisma migrate deploy`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id String @id @default(cuid())
+}
