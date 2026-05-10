@@ -303,32 +303,34 @@ Async boundary:
 
 Juan can build entirely against mocked session and memory responses while Tallal and Nour build the real pipeline.
 
-### Fourth Teammate: Witsmith Safety, Contract Engine, Amend/Rescue
+### Alex Du: Witsmith CLI, Contract Engine, Amend/Rescue
 
-The fourth teammate owns the existing Witsmith safety and intelligence layer.
+Alex owns the Witsmith safety layer and initial CLI work.
 
-Core work:
+Work completed:
 
-- Maintain `AGENT_WIT.yaml` contract behavior.
-- Improve `allow` / `ask` / `deny` command decisions.
-- Keep `witsmith run` strong and stable.
-- Maintain `.witsmith/log.jsonl` event quality.
-- Own `witsmith amend --last`.
-- Own `witsmith rescue --last`.
-- Own CLōD-backed check/fallback behavior.
-- Own `witsmith-server` and MCP tools.
+- Added the initial Witsmith CLI package under `apps/cli/witsmith`.
+- Built `witsmith run` as the command gatekeeper for `allow` / `ask` / `deny` decisions.
+- Added `AGENT_WIT.yaml` contract loading and structured rule checks.
+- Added `.witsmith/log.jsonl` replay events for command decisions and execution results.
+- Added `witsmith amend --last` for suggested contract updates after denied actions.
+- Added `witsmith rescue --last` for failure analysis and handoff notes.
+- Added `witsmith-server` MCP tools for checks, analysis, and amendments.
+- Integrated CLōD-backed natural-language checks and fallback behavior.
+- Adapted Witsmith outputs to the shared Blackbox contracts: `ContractDecision`, `ContractEvent`, and `ContractAmendment`.
+- Added confidence/risk-based model routing for cheaper checks and stronger policy-changing amendments.
 
 Deliverables:
 
 - Reliable command gatekeeper.
-- Useful deny/ask reasons.
-- Amend flow for contract updates.
+- Replayable contract events for the session timeline.
+- Structured amendment suggestions for dashboard display.
 - Rescue flow and handoff notes.
-- Stable MCP/server behavior.
+- Stable CLI and MCP integration points.
 
 Async boundary:
 
-The safety layer can improve independently as long as `.witsmith/log.jsonl` action events keep a stable shape for `witsmith finish`.
+Witsmith can improve independently as long as `.witsmith/log.jsonl` action events and the team-facing contract outputs keep a stable shape for `witsmith finish`, analysis, and dashboard consumption.
 
 ## Shared Interfaces
 
