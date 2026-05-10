@@ -1,3 +1,0 @@
-Home page: https://www.greptile.com/
-
-Greptile is here to save your project from demo-day embarrassment. Enable it on your repo and we'll hunt bugs in your PRs for you. The team that fixes the juiciest bugs Greptile catches wins CAD 600. The severity of the bugs caught and the shipping velocity of your team are the main determinants of who wins. As a bonus, nominate one moment Greptile saved your project (link to GitHub comment) and it will earn you extra points.
