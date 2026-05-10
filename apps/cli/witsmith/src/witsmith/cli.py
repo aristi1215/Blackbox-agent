@@ -19,6 +19,13 @@ from witsmith.layout import find_wit_file
 from witsmith.models import Action, CheckResult
 from witsmith.replay import append_event, new_action_id, read_last_deny, utc_now_iso
 from witsmith.scaffold_docs import ensure_hackathon_docs
+from witsmith.session import (
+    cmd_context,
+    cmd_finish,
+    cmd_init,
+    cmd_stale_check,
+    cmd_start,
+)
 from witsmith.wit_file import wit_yaml_text
 
 
@@ -206,6 +213,23 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="witsmith", description="Agent permission checks + replay log.")
     sub = p.add_subparsers(dest="cmd")
 
+    pi = sub.add_parser("init", help="Initialize Witsmith runtime files")
+    pi.add_argument("--cwd", default=".", help="Repo/project root to initialize")
+
+    pst = sub.add_parser("start", help="Start a Witsmith recording session")
+    pst.add_argument("task", help="Task description for this session")
+    pst.add_argument("--cwd", default=".", help="Repo/project root for the session")
+
+    pf = sub.add_parser("finish", help="Finish the active Witsmith recording session")
+    pf.add_argument("--cwd", default=".", help="Repo/project root for the session")
+
+    pc = sub.add_parser("context", help="Write relevant memory context for a new task")
+    pc.add_argument("task", help="Next task to retrieve context for")
+    pc.add_argument("--cwd", default=".", help="Repo/project root to read sessions from")
+
+    pscq = sub.add_parser("stale-check", help="Count memory cards; hash stale-check comes later")
+    pscq.add_argument("--cwd", default=".", help="Repo/project root to read sessions from")
+
     pr = sub.add_parser("run", help="wit_check → optional execute")
     pr.add_argument(
         "shell_cmd",
@@ -264,6 +288,16 @@ def main(argv: list[str] | None = None) -> int:
     if ns.cmd is None:
         parser.print_help()
         return 0
+    if ns.cmd == "init":
+        return cmd_init(ns.cwd)
+    if ns.cmd == "start":
+        return cmd_start(ns.task, ns.cwd)
+    if ns.cmd == "finish":
+        return cmd_finish(ns.cwd)
+    if ns.cmd == "context":
+        return cmd_context(ns.task, ns.cwd)
+    if ns.cmd == "stale-check":
+        return cmd_stale_check(ns.cwd)
     if ns.cmd == "run":
         return cmd_run(ns)
     if ns.cmd == "amend":
