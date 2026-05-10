@@ -1,7 +1,7 @@
 {
   "name": "blackbox-agent",
   "version": "1.0.0",
-  "description": "",
+  "description": "Vancouver Cursor Hackathon 2026 — apps/* + witsmith/",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -19,7 +19,8 @@
     "url": "git+https://github.com/aristi1215/Blackbox-agent.git"
   },
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "keywords": [],
   "author": "",

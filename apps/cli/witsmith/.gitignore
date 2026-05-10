@@ -1,0 +1,70 @@
+# env / secrets
+.env
+.env.*.local
+.env.local
+
+# CLōD JWT lives in docs/CL*.md — never commit; use .env (see .env.example)
+docs/CL*.md
+
+# LaTeX build noise (slides/)
+slides/*.aux
+slides/*.fdb_latexmk
+slides/*.fls
+slides/*.nav
+slides/*.out
+slides/*.snm
+slides/*.toc
+
+# uv / Python env
+.venv/
+.uv/
+venv/
+
+# repo root (generated from witsmith.scaffold_templates unless already present)
+/DONE.md
+/AGENTS.md
+/RECENT_NOTES.md
+
+# build / packaging
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.coverage
+coverage.xml
+htmlcov/
+
+# witsmith runtime
+.witsmith/
+*.sqlite
+*.sqlite-journal
+
+# demo-repo — Next.js + Prisma (see demo-repo/README.md)
+demo-repo/node_modules/
+demo-repo/.next/
+demo-repo/out/
+demo-repo/.turbo/
+demo-repo/.swc/
+demo-repo/.eslintcache
+demo-repo/*.tsbuildinfo
+demo-repo/prisma/dev.db
+demo-repo/prisma/dev.db-journal
+demo-repo/.env
+demo-repo/.env.local
+
+# misc
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

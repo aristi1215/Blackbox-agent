@@ -1,9 +1,15 @@
 {
   "name": "cli",
   "version": "1.0.0",
-  "description": "",
+  "description": "Workspace launcher for Witsmith (Python package under repo root witsmith/)",
   "main": "index.js",
+  "bin": {
+    "witsmith": "./bin/witsmith.js",
+    "witsmith-server": "./bin/witsmith-server.js"
+  },
   "scripts": {
+    "witsmith": "node ./bin/witsmith.js",
+    "witsmith-server": "node ./bin/witsmith-server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

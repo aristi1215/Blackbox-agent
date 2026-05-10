@@ -1,0 +1,21 @@
+{
+  "name": "witsmith-demo-repo",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "test": "prisma generate && node --test tests/email-column.test.cjs",
+    "db:deploy": "prisma migrate deploy",
+    "db:reset": "prisma migrate reset --force"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.0",
+    "next": "^14.2.18",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "prisma": "^6.3.0",
+    "typescript": "^5.6.3"
+  }
+}

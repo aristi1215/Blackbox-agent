@@ -1,1 +1,8 @@
-node_modules
+# Monorepo root (JS workspaces hoist deps here sometimes)
+node_modules/
+
+# Junk
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
