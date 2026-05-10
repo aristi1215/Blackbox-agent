@@ -42,3 +42,25 @@ def model_escalation_enabled() -> bool:
 def model_escalation_threshold() -> float:
     _load_env_once()
     return float(os.environ.get("WITSMITH_MODEL_ESCALATE_BELOW", "0.75"))
+
+
+def dashboard_import_url() -> str:
+    """If set, `witsmith finish` POSTs the session JSON path to this URL (e.g. .../api/import)."""
+    _load_env_once()
+    return os.environ.get("WITSMITH_DASHBOARD_IMPORT_URL", "").strip()
+
+
+def dashboard_import_timeout_seconds() -> float:
+    _load_env_once()
+    return float(os.environ.get("WITSMITH_DASHBOARD_IMPORT_TIMEOUT_SECONDS", "15"))
+
+
+def dashboard_import_strict() -> bool:
+    """When true, `witsmith finish` returns non-zero if the dashboard import HTTP call fails."""
+    _load_env_once()
+    return os.environ.get("WITSMITH_DASHBOARD_IMPORT_STRICT", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )

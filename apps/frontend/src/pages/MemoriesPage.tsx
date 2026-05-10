@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   Search,
@@ -10,7 +10,9 @@ import {
   ScanLine,
   RefreshCw,
 } from "lucide-react";
-import { memoryCards, sessions } from "../lib/mockData";
+import { memoryCards, sessions, type MemoryCard } from "../lib/mockData";
+import { useApiMode, fetchMemoriesList } from "../lib/api";
+import { mapDbMemoryToUi } from "../lib/mapApiSession";
 import { MemoryCardItem } from "../components/ui/MemoryCardItem";
 import { Badge } from "../components/ui/Badge";
 import { cn } from "../lib/cn";
@@ -26,13 +28,26 @@ const typeFilters: { id: "all" | CardType; label: string; icon: React.ComponentT
 ];
 
 export function MemoriesPage() {
+  const apiMode = useApiMode();
+  const [apiCards, setApiCards] = useState<MemoryCard[] | null>(null);
+  const [apiErr, setApiErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!apiMode) return;
+    fetchMemoriesList()
+      .then((rows) => setApiCards(rows.map(mapDbMemoryToUi)))
+      .catch((e: Error) => setApiErr(e.message));
+  }, [apiMode]);
+
+  const cardDataset = apiMode ? apiCards ?? [] : memoryCards;
+
   const [query, setQuery] = useState("");
   const [type, setType] = useState<"all" | CardType>("all");
   const [staleOnly, setStaleOnly] = useState(false);
   const [taskQuery, setTaskQuery] = useState("");
 
   const filtered = useMemo(() => {
-    return memoryCards.filter((c) => {
+    return cardDataset.filter((c) => {
       const matchType = type === "all" || c.type === type;
       const matchStale = !staleOnly || c.is_stale;
       const q = query.trim().toLowerCase();
@@ -44,15 +59,15 @@ export function MemoriesPage() {
         c.source_files.some((f) => f.toLowerCase().includes(q));
       return matchType && matchStale && matchQuery;
     });
-  }, [query, type, staleOnly]);
+  }, [query, type, staleOnly, cardDataset]);
 
-  const staleCount = memoryCards.filter((c) => c.is_stale).length;
+  const staleCount = cardDataset.filter((c) => c.is_stale).length;
 
   // Simulated retrieval
   const suggested = useMemo(() => {
     if (!taskQuery.trim()) return [];
     const q = taskQuery.toLowerCase();
-    return memoryCards
+    return cardDataset
       .map((c) => {
         const score = c.retrieve_when.reduce(
           (acc, k) => acc + (q.includes(k) ? 2 : 0),
@@ -63,11 +78,21 @@ export function MemoriesPage() {
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 4);
-  }, [taskQuery]);
+  }, [taskQuery, cardDataset]);
+
+  const apiLoading = apiMode && apiCards === null && !apiErr;
+  const sessionCountForFooter = apiMode
+    ? new Set(cardDataset.map((c) => c.session_id)).size
+    : sessions.length;
 
   return (
     <div className="px-4 py-8 lg:px-8">
       <div className="mx-auto max-w-7xl">
+        {apiErr && (
+          <div className="mb-6 rounded-xl border border-[color:var(--color-danger)]/35 bg-[color:var(--color-danger)]/10 px-4 py-3 font-mono text-[13px] text-[color:var(--color-danger)]">
+            API error: {apiErr}
+          </div>
+        )}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <Badge tone="violet" className="mb-3">
@@ -81,6 +106,9 @@ export function MemoriesPage() {
               enriched with Greptile review. Stale ones light up the moment their source files
               change.
             </p>
+            <p className="mt-2 text-[13px] text-[color:var(--color-acid)]/90">
+              Click any card to open a full, readable view with evidence and source files.
+            </p>
           </div>
           <button className="inline-flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 text-[13px] text-white hover:border-white/20">
             <ScanLine className="h-4 w-4 text-[color:var(--color-acid)]" />
@@ -91,15 +119,15 @@ export function MemoriesPage() {
         {/* Stat strip */}
         <div className="mt-8 grid gap-3 md:grid-cols-4">
           {[
-            { l: "Total cards", v: memoryCards.length, c: "var(--color-violet-glow)" },
+            { l: "Total cards", v: cardDataset.length, c: "var(--color-violet-glow)" },
             {
               l: "By risk type",
-              v: memoryCards.filter((c) => c.type === "risk").length,
+              v: cardDataset.filter((c) => c.type === "risk").length,
               c: "var(--color-warn)",
             },
             {
               l: "Sessions covered",
-              v: new Set(memoryCards.map((c) => c.session_id)).size,
+              v: new Set(cardDataset.map((c) => c.session_id)).size,
               c: "var(--color-electric)",
             },
             {
@@ -244,7 +272,11 @@ export function MemoriesPage() {
 
         {/* Cards */}
         <div className="mt-6">
-          {filtered.length === 0 ? (
+          {apiLoading ? (
+            <div className="rounded-2xl border border-dashed border-white/10 px-5 py-16 text-center text-sm text-white/55">
+              Loading memories from API…
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-white/10 px-5 py-16 text-center text-sm text-white/55">
               No memory cards match.
             </div>
@@ -260,7 +292,9 @@ export function MemoriesPage() {
         {/* Footer note */}
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/5 bg-white/[0.02] px-5 py-4 text-[12px] text-white/55">
           <span>
-            Memory cards are derived from {sessions.length} sessions across the demo dataset.
+            Memory cards are derived from {sessionCountForFooter} session
+            {sessionCountForFooter === 1 ? "" : "s"}
+            {apiMode ? " (API)" : " across the demo dataset"}.
           </span>
           <span className="font-mono">
             stale_if_changed → re-hashed every `witsmith stale-check`

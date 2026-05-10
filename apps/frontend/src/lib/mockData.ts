@@ -1104,3 +1104,32 @@ export function formatRelative(iso: string): string {
   if (m > 0) return `${m}m ago`;
   return "just now";
 }
+
+/** Calendar-style local date/time for humans (e.g. May 10, 2026, 3:02 PM). */
+export function formatAbsoluteDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(d);
+  } catch {
+    return iso;
+  }
+}
+
+export function formatSessionTimeRange(startedIso: string, finishedIso: string): string {
+  return `${formatAbsoluteDate(startedIso)} → ${formatAbsoluteDate(finishedIso)}`;
+}
+
+const memoryTypeLabels: Record<MemoryCard["type"], string> = {
+  episodic: "What happened",
+  semantic: "Concept or rule",
+  procedural: "How to do it",
+  risk: "Risk or gotcha",
+};
+
+export function humanMemoryType(type: MemoryCard["type"]): string {
+  return memoryTypeLabels[type] ?? type;
+}

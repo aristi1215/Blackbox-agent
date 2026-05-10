@@ -1,5 +1,7 @@
 export { analyzeBundle } from "./analysis/analyzeBundle";
 export { importSession } from "./db/importSession";
+export { persistSessionFromCliJson } from "./db/persistSessionFromCliJson";
+export { prisma } from "./db/client";
 export { getContextForTask } from "./memory/getContextForTask";
 export { runStaleCheck } from "./memory/runStaleCheck";
 export { loadMemories, markStale } from "./memory/storeMemories";

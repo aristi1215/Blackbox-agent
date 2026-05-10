@@ -7,10 +7,17 @@ import re
 import shutil
 import subprocess
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
-from witsmith.config import witsmith_data_dirname
+from witsmith.config import (
+    dashboard_import_strict,
+    dashboard_import_timeout_seconds,
+    dashboard_import_url,
+    witsmith_data_dirname,
+)
 from witsmith.layout import WIT_FILENAME, find_wit_file
 from witsmith.replay import log_size, read_events_from_offset, utc_now_iso
 
@@ -219,7 +226,41 @@ def cmd_finish(cwd: str) -> int:
     session_path.write_text(json.dumps(bundle, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     active_path.unlink()
     print(f"witsmith finish: wrote {session_path}")
+
+    import_ok, import_msg = _push_session_json_to_dashboard(session_path.resolve())
+    if import_msg:
+        print(import_msg)
+    if not import_ok and dashboard_import_strict():
+        return 7
+
     return 0
+
+
+def _push_session_json_to_dashboard(session_path: Path) -> tuple[bool, str]:
+    """POST absolute session path to WITSMITH_DASHBOARD_IMPORT_URL if configured."""
+    url = dashboard_import_url()
+    if not url:
+        return True, ""
+
+    body = json.dumps({"path": str(session_path)}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        timeout = dashboard_import_timeout_seconds()
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            _ = resp.read()
+        return True, f"witsmith finish: dashboard import OK ({url})"
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:500]
+        return False, f"witsmith finish: dashboard import failed HTTP {e.code}: {detail}"
+    except urllib.error.URLError as e:
+        return False, f"witsmith finish: dashboard import failed: {e.reason}"
+    except TimeoutError:
+        return False, "witsmith finish: dashboard import timed out"
 
 
 def cmd_context(task: str, cwd: str) -> int:

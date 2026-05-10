@@ -1,5 +1,5 @@
 import { useParams, Link, Navigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
   ArrowLeft,
@@ -32,17 +32,25 @@ import {
   formatRelative,
   statusMeta,
   sponsorMeta,
+  type MemoryCard,
+  type Session,
 } from "../lib/mockData";
+import { useApiMode, fetchSessionDetail } from "../lib/api";
+import { mapDetailResponse, type SessionEvidence } from "../lib/mapApiSession";
 import { Badge } from "../components/ui/Badge";
 import { SponsorBadge } from "../components/ui/SponsorBadge";
 import { ConfidenceMeter, ConfidenceBar } from "../components/ui/ConfidenceMeter";
 import { DiffViewer } from "../components/ui/DiffViewer";
 import { Timeline } from "../components/ui/Timeline";
 import { MemoryCardItem } from "../components/ui/MemoryCardItem";
+import { SessionStoryCard } from "../components/session/SessionStoryCard";
+import { SessionEvidenceTab } from "../components/session/SessionEvidenceTab";
 import { cn } from "../lib/cn";
+import { BookOpen } from "lucide-react";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: Sparkles },
+  { id: "story", label: "Story", icon: BookOpen },
   { id: "timeline", label: "Timeline", icon: Clock },
   { id: "diff", label: "Diff", icon: GitCommit },
   { id: "tests", label: "Tests & commands", icon: TestTube2 },
@@ -50,19 +58,56 @@ const tabs = [
 ] as const;
 
 export function SessionDetailPage() {
+  const apiMode = useApiMode();
   const { id } = useParams<{ id: string }>();
-  const session = id ? getSession(id) : undefined;
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("overview");
   const [copied, setCopied] = useState(false);
+  const [apiPayload, setApiPayload] = useState<{
+    session: Session;
+    cards: MemoryCard[];
+    evidence: SessionEvidence;
+  } | null>(null);
+  const [apiErr, setApiErr] = useState<string | null>(null);
+  // Default to "loading" while in API mode so we don't redirect to /sessions
+  // before the fetch even has a chance to start.
+  const [apiLoading, setApiLoading] = useState(apiMode);
 
+  useEffect(() => {
+    if (!apiMode || !id) {
+      setApiLoading(false);
+      return;
+    }
+    setApiLoading(true);
+    setApiErr(null);
+    fetchSessionDetail(id)
+      .then((d) => setApiPayload(mapDetailResponse(d)))
+      .catch((e: Error) => setApiErr(e.message))
+      .finally(() => setApiLoading(false));
+  }, [apiMode, id]);
+
+  const mockSession = !apiMode && id ? getSession(id) : undefined;
+  const session = apiMode ? apiPayload?.session : mockSession;
+
+  if (apiMode && apiLoading) {
+    return (
+      <div className="px-4 py-16 text-center text-sm text-white/55">Loading session…</div>
+    );
+  }
+  if (apiMode && apiErr) {
+    return (
+      <div className="px-4 py-16 text-center text-sm text-[color:var(--color-danger)]">{apiErr}</div>
+    );
+  }
   if (!session) return <Navigate to="/sessions" replace />;
 
   const meta = statusMeta(session.status);
   const totalAdded = session.changed_files.reduce((a, f) => a + f.added, 0);
   const totalRemoved = session.changed_files.reduce((a, f) => a + f.removed, 0);
-  const cards = session.memory_cards
-    .map((mid) => getMemoryCard(mid))
-    .filter((c): c is NonNullable<typeof c> => Boolean(c));
+  const cards = apiMode
+    ? apiPayload?.cards ?? []
+    : session.memory_cards
+        .map((mid) => getMemoryCard(mid))
+        .filter((c): c is NonNullable<typeof c> => Boolean(c));
 
   function copyId() {
     navigator.clipboard?.writeText(session!.id);
@@ -142,6 +187,14 @@ export function SessionDetailPage() {
           </div>
         </div>
 
+        <div className="mt-8">
+          <SessionStoryCard
+            session={session}
+            memoryCardCount={cards.length}
+            commandCount={session.commands.length}
+          />
+        </div>
+
         {/* Quick stats */}
         <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
           <Mini
@@ -210,6 +263,14 @@ export function SessionDetailPage() {
         {/* Content */}
         <div className="mt-6">
           {tab === "overview" && <OverviewTab session={session} cards={cards} />}
+          {tab === "story" && (
+            <StoryTab
+              session={session}
+              cards={cards}
+              evidence={apiMode ? apiPayload?.evidence ?? null : null}
+              commandCount={session.commands.length}
+            />
+          )}
           {tab === "timeline" && (
             <div className="grid gap-6 md:grid-cols-[2fr_1fr]">
               <div className="rounded-2xl border border-white/10 bg-[color:var(--color-surface)] p-6">
@@ -640,6 +701,26 @@ function TestsTab({ session }: { session: NonNullable<ReturnType<typeof getSessi
       </div>
     </div>
   );
+}
+
+/* ---------------------------- Story tab ---------------------------- */
+
+function StoryTab({
+  evidence,
+}: {
+  session: NonNullable<ReturnType<typeof getSession>>;
+  cards: NonNullable<ReturnType<typeof getMemoryCard>>[];
+  evidence: SessionEvidence | null;
+  commandCount: number;
+}) {
+  if (!evidence) {
+    return (
+      <div className="rounded-2xl border border-dashed border-white/10 px-6 py-10 text-center text-sm text-white/55">
+        Detailed evidence is only available for sessions imported from the Witsmith CLI.
+      </div>
+    );
+  }
+  return <SessionEvidenceTab evidence={evidence} />;
 }
 
 /* ------------------------- Assumptions panel ------------------------- */

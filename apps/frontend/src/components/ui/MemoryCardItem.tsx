@@ -1,9 +1,20 @@
+import { useState } from "react";
 import { motion } from "motion/react";
-import { AlertTriangle, Brain, FileCode2, Sparkles, ShieldAlert, Workflow, Library } from "lucide-react";
+import {
+  AlertTriangle,
+  Brain,
+  FileCode2,
+  Sparkles,
+  ShieldAlert,
+  Workflow,
+  Library,
+  Maximize2,
+} from "lucide-react";
 import type { MemoryCard } from "../../lib/mockData";
 import { formatRelative } from "../../lib/mockData";
 import { Badge } from "./Badge";
 import { SponsorBadge } from "./SponsorBadge";
+import { MemoryCardDetailModal } from "./MemoryCardDetailModal";
 import { cn } from "../../lib/cn";
 
 const typeIcon = {
@@ -24,16 +35,34 @@ export function MemoryCardItem({
   card,
   index = 0,
   compact = false,
+  readableDetail = true,
 }: {
   card: MemoryCard;
   index?: number;
   compact?: boolean;
+  /** Open full human-readable modal on click (Escape to close). */
+  readableDetail?: boolean;
 }) {
+  const [detailOpen, setDetailOpen] = useState(false);
   const Icon = typeIcon[card.type];
   const color = typeColor[card.type];
 
   return (
+    <>
     <motion.div
+      role={readableDetail ? "button" : undefined}
+      tabIndex={readableDetail ? 0 : undefined}
+      onClick={readableDetail ? () => setDetailOpen(true) : undefined}
+      onKeyDown={
+        readableDetail
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setDetailOpen(true);
+              }
+            }
+          : undefined
+      }
       initial={{ opacity: 0, y: 10 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-10% 0px" }}
@@ -41,6 +70,7 @@ export function MemoryCardItem({
       whileHover={{ y: -2 }}
       className={cn(
         "group relative overflow-hidden rounded-2xl border bg-[color:var(--color-surface)] p-5 transition-colors",
+        readableDetail && "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-acid)]",
         card.is_stale
           ? "border-[color:var(--color-warn)]/30"
           : "border-[color:var(--color-border)] hover:border-white/15"
@@ -88,12 +118,17 @@ export function MemoryCardItem({
 
       {!compact && card.evidence.length > 0 && (
         <div className="mt-3 space-y-1 border-l border-white/10 pl-3">
-          {card.evidence.map((e, i) => (
-            <div key={i} className="text-[11.5px] text-white/55">
-              <span className="text-[color:var(--color-dim)]">— </span>
-              <span className="font-mono">{e}</span>
+          {card.evidence.slice(0, 3).map((e, i) => (
+            <div key={i} className="text-[12px] leading-snug text-white/65">
+              <span className="text-[color:var(--color-dim)]">• </span>
+              {e}
             </div>
           ))}
+          {card.evidence.length > 3 && (
+            <p className="text-[11px] text-white/40">
+              +{card.evidence.length - 3} more in full view
+            </p>
+          )}
         </div>
       )}
 
@@ -116,13 +151,24 @@ export function MemoryCardItem({
           {card.retrieve_when.slice(0, 5).map((k) => (
             <span
               key={k}
-              className="rounded-md border border-white/5 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[10.5px] text-white/55"
+              className="rounded-md border border-white/5 bg-white/[0.03] px-1.5 py-0.5 text-[10.5px] text-white/65"
             >
-              #{k}
+              {k}
             </span>
           ))}
         </div>
       )}
+
+      {readableDetail && !compact && (
+        <div className="mt-4 flex items-center gap-1.5 text-[11px] text-[color:var(--color-acid)]/90 opacity-80 group-hover:opacity-100">
+          <Maximize2 className="h-3 w-3" />
+          <span>Click for full readable view</span>
+        </div>
+      )}
     </motion.div>
+    {readableDetail && (
+      <MemoryCardDetailModal card={card} open={detailOpen} onClose={() => setDetailOpen(false)} />
+    )}
+    </>
   );
 }

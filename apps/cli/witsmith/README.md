@@ -225,3 +225,58 @@ Nour's layer should import:
 - `report.memoryCards`
 
 Juan's dashboard can use the same shape for mocked or real dashboard data.
+
+## Full-stack demo (`demo-repo` → SQLite → API → Vite UI)
+
+Use branch `demo/full-stack-integration` and the repo root `npm` workspaces.
+
+1. **Prepare SQLite** (once per clone):
+
+   ```bash
+   cd apps/core
+   DATABASE_URL="file:./dev.db" npx prisma db push
+   ```
+
+2. **Record in `demo-repo`** (from this directory):
+
+   ```bash
+   uv run witsmith init --cwd demo-repo
+   uv run witsmith start "Demo task" --cwd demo-repo
+   uv run witsmith run "npm test" --cwd demo-repo --no-exec
+   uv run witsmith finish --cwd demo-repo
+   ```
+
+   Note the new file under `demo-repo/.witsmith/sessions/`.
+
+3. **Import without LLMs** — build `@blackbox/core` and `backend`, then start the API from the **repository root**, then POST the session path (must stay under `demo-repo/`, this package, `apps/core/mock/`, or an absolute path inside those trees):
+
+   ```bash
+   npm run build --workspace @blackbox/core
+   npm run build --workspace backend
+   npm run backend:dev
+   curl -s -X POST http://localhost:8787/api/import \
+     -H "Content-Type: application/json" \
+     -d '{"path":"apps/cli/witsmith/demo-repo/.witsmith/sessions/session_REPLACE.json"}'
+   ```
+
+   For LLM-enriched analysis, use `importSession()` from `@blackbox/core` (requires API keys) instead of this POST endpoint.
+
+4. **Dashboard** — in another terminal, enable API mode and start Vite:
+
+   ```bash
+   cp apps/frontend/.env.example apps/frontend/.env
+   # Ensure: VITE_USE_API=true
+   npm run frontend:dev
+   ```
+
+   Open the Sessions and Memories routes; Vite proxies `/api` to `http://localhost:8787`.
+
+### Auto-import on `witsmith finish`
+
+If the dashboard API is running, set in your environment or `apps/cli/witsmith/.env`:
+
+```bash
+export WITSMITH_DASHBOARD_IMPORT_URL=http://127.0.0.1:8787/api/import
+```
+
+Then every successful `witsmith finish` POSTs the new session file’s **absolute path** to that URL (same as manual `curl` import). Import failures print a warning; set `WITSMITH_DASHBOARD_IMPORT_STRICT=1` to make `finish` exit with code 7 when the HTTP call fails.

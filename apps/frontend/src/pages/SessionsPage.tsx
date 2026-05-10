@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import {
@@ -20,8 +20,11 @@ import {
   sessions,
   formatDuration,
   formatRelative,
+  formatAbsoluteDate,
   type SessionStatus,
 } from "../lib/mockData";
+import { useApiMode, fetchSessionsList, type ApiSessionListItem } from "../lib/api";
+import { mapListItemToSession } from "../lib/mapApiSession";
 import { Badge } from "../components/ui/Badge";
 import { Sparkline } from "../components/ui/Sparkline";
 import { AnimatedNumber } from "../components/ui/AnimatedNumber";
@@ -37,11 +40,31 @@ const statusFilters: { id: "all" | SessionStatus; label: string }[] = [
 ];
 
 export function SessionsPage() {
+  const apiMode = useApiMode();
+  const [apiRows, setApiRows] = useState<ApiSessionListItem[] | null>(null);
+  const [apiErr, setApiErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!apiMode) return;
+    fetchSessionsList()
+      .then(setApiRows)
+      .catch((e: Error) => setApiErr(e.message));
+  }, [apiMode]);
+
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | SessionStatus>("all");
 
+  const sessionsList = useMemo(() => {
+    if (!apiMode) return sessions;
+    if (!apiRows) return [];
+    return apiRows.map((row) => ({
+      ...mapListItemToSession(row),
+      description: `${row.task} · ${row._count.memoryCards} memory cards`,
+    }));
+  }, [apiMode, apiRows]);
+
   const filtered = useMemo(() => {
-    return sessions.filter((s) => {
+    return sessionsList.filter((s) => {
       const matchStatus = status === "all" || s.status === status;
       const q = query.trim().toLowerCase();
       const matchQuery =
@@ -52,20 +75,35 @@ export function SessionsPage() {
         s.id.toLowerCase().includes(q);
       return matchStatus && matchQuery;
     });
-  }, [query, status]);
+  }, [query, status, sessionsList]);
 
   const stats = useMemo(() => {
+    if (apiMode && apiRows) {
+      const ok = apiRows.filter((r) => r.status === "finished").length;
+      const totalCards = apiRows.reduce((acc, r) => acc + r._count.memoryCards, 0);
+      const avgConfidence =
+        sessionsList.reduce((acc, s) => acc + s.analysis.confidence.score, 0) /
+        Math.max(sessionsList.length, 1);
+      return { total: apiRows.length, ok, totalCards, avgConfidence };
+    }
     const total = sessions.length;
     const ok = sessions.filter((s) => s.status === "success").length;
     const totalCards = sessions.reduce((acc, s) => acc + s.memory_cards.length, 0);
     const avgConfidence =
       sessions.reduce((acc, s) => acc + s.analysis.confidence.score, 0) / total;
     return { total, ok, totalCards, avgConfidence };
-  }, []);
+  }, [apiMode, apiRows, sessionsList]);
+
+  const apiLoading = apiMode && apiRows === null && !apiErr;
 
   return (
     <div className="px-4 py-8 lg:px-8">
       <div className="mx-auto max-w-7xl">
+        {apiErr && (
+          <div className="mb-6 rounded-xl border border-[color:var(--color-danger)]/35 bg-[color:var(--color-danger)]/10 px-4 py-3 font-mono text-[13px] text-[color:var(--color-danger)]">
+            API error: {apiErr}
+          </div>
+        )}
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <Badge tone="electric" className="mb-3">
@@ -106,7 +144,7 @@ export function SessionsPage() {
                 <span className="text-white/35"> / {stats.total}</span>
               </>
             }
-            sub={`${Math.round((stats.ok / stats.total) * 100)}% success rate`}
+            sub={`${stats.total ? Math.round((stats.ok / stats.total) * 100) : 0}% success rate`}
             spark={[3, 4, 4, 5, 5, 6, 7]}
             color="var(--color-success)"
           />
@@ -172,23 +210,29 @@ export function SessionsPage() {
 
         {/* Sessions table/list */}
         <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[color:var(--color-surface)]/60">
-          <div className="hidden grid-cols-[2.5fr_1fr_1fr_1fr_0.8fr_0.7fr] gap-4 border-b border-white/5 bg-white/[0.02] px-5 py-3 text-[10.5px] font-medium uppercase tracking-[0.16em] text-white/45 lg:grid">
-            <div>Task</div>
-            <div>Branch</div>
-            <div>Files</div>
-            <div>Tests</div>
-            <div>Confidence</div>
-            <div className="text-right">Started</div>
-          </div>
-
-          {filtered.length === 0 && (
+          {apiLoading ? (
             <div className="px-5 py-16 text-center text-sm text-white/55">
-              No sessions match those filters.
+              Loading sessions from API…
             </div>
-          )}
+          ) : (
+            <>
+              <div className="hidden grid-cols-[2.5fr_1fr_1fr_1fr_0.8fr_0.7fr] gap-4 border-b border-white/5 bg-white/[0.02] px-5 py-3 text-[10.5px] font-medium uppercase tracking-[0.16em] text-white/45 lg:grid">
+                <div>Task</div>
+                <div>Branch</div>
+                <div>Files</div>
+                <div>Tests</div>
+                <div>Confidence</div>
+                <div className="text-right">Started</div>
+              </div>
 
-          <ul>
-            {filtered.map((s, i) => (
+              {filtered.length === 0 && (
+                <div className="px-5 py-16 text-center text-sm text-white/55">
+                  No sessions match those filters.
+                </div>
+              )}
+
+              <ul>
+                {filtered.map((s, i) => (
               <motion.li
                 key={s.id}
                 initial={{ opacity: 0, y: 8 }}
@@ -210,12 +254,22 @@ export function SessionsPage() {
                           </span>
                           <ArrowUpRight className="h-3.5 w-3.5 -translate-x-1 text-white/30 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
                         </div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11.5px] text-white/45">
-                          <span className="font-mono">{s.id}</span>
-                          <span>·</span>
-                          <span>{s.repo}</span>
-                          <span>·</span>
-                          <span className="font-mono">{s.agent.model}</span>
+                        <div className="mt-1 space-y-0.5 text-[12px] leading-snug text-white/60">
+                          <p>
+                            <span className="text-white/45">Recorded </span>
+                            {formatAbsoluteDate(s.started_at)}
+                            <span className="text-white/35"> · </span>
+                            {s.changed_files.length} file
+                            {s.changed_files.length === 1 ? "" : "s"}
+                            <span className="text-white/35"> · </span>
+                            {s.memory_cards.length}{" "}
+                            {s.memory_cards.length === 1 ? "memory" : "memories"}
+                          </p>
+                          <p className="text-[11px] text-white/40">
+                            <span className="font-mono">{s.id}</span>
+                            <span> · </span>
+                            {s.repo}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -264,8 +318,10 @@ export function SessionsPage() {
                   </div>
                 </Link>
               </motion.li>
-            ))}
-          </ul>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       </div>
     </div>
