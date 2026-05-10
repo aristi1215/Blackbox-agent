@@ -4,20 +4,17 @@ Vancouver Cursor Hackathon 2026 monorepo fork: [`yaoDu/Blackbox-agent`](https://
 
 | Path | Contents |
 |------|----------|
-| `apps/*` | npm workspaces (`cli`, `backend`, `frontend` Vite app) |
-| **`witsmith/`** | **Witsmith** — Python package (MCP + CLI, demo Next app under `witsmith/demo-repo/`) |
+| `apps/*` | npm workspaces (`cli`, `backend`, `frontend` Vite app). Witsmith’s Python package and demo app live under **`apps/cli/witsmith/`**. |
 
-Witsmith setup: see **`witsmith/README.md`**. From repo root:
+Witsmith is colocated under the CLI workspace so the monorepo keeps a single “agent CLI” subtree. From repo root:
 
 ```bash
-cd witsmith && uv sync && uv run witsmith scaffold
+cd apps/cli/witsmith && uv sync && uv run witsmith scaffold
 ```
 
-This folder is intentionally separate from the JS workspaces so uv/pyproject tooling stays scoped under `witsmith/`.
+## Align `apps/cli/witsmith/` with your working copy
 
-## Align `witsmith/` with your working copy
-
-The canonical hackathon edits live under **`cursor_van2026`** (or any full clone); to refresh **`witsmith/`** inside this fork:
+The canonical hackathon edits may live elsewhere (for example **`cursor_van2026`**); to refresh **`apps/cli/witsmith/`** inside this fork:
 
 ```bash
 rsync -a \
@@ -25,7 +22,7 @@ rsync -a \
   --exclude '__pycache__' --exclude '.env' --exclude '.DS_Store' \
   --exclude 'demo-repo/node_modules' --exclude '.ruff_cache' --exclude '.witsmith' \
   --exclude 'demo-repo/prisma/dev.db' --exclude 'demo-repo/prisma/dev.db-journal' \
-  /path/to/cursor_van2026/ ./witsmith/
+  /path/to/cursor_van2026/ ./apps/cli/witsmith/
 ```
 
-Example (adjust the source path): `~/Industry/Hackathon/cursor_van2026/` → `./witsmith/`. Then commit and push to [**yaoDu/Blackbox-agent**](https://github.com/yaoDu/Blackbox-agent).
+Example (adjust the source path): `~/Industry/Hackathon/cursor_van2026/` → `./apps/cli/witsmith/`. Then commit and push to [**yaoDu/Blackbox-agent**](https://github.com/yaoDu/Blackbox-agent).
