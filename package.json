@@ -11,7 +11,8 @@
     "url": "git+https://github.com/aristi1215/Blackbox-agent.git"
   },
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "keywords": [],
   "author": "",
