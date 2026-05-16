@@ -49,7 +49,10 @@ Use evidence. Do not guess.
 
 STARTER_WIT = """version: 1
 repo: witsmith-project
+# Witsmith runs ALLOW-LIST by default.
+# Commands not listed under allow require explicit approval.
 notes:
+  framework: "Node.js"
   test_command: "npm test"
   danger_zones:
     - "destructive filesystem commands"
@@ -57,14 +60,25 @@ notes:
 
 allow:
   - pattern: "npm test"
+  - pattern: "npm run *"
+  - pattern: "git status"
+  - pattern: "git diff*"
+  - pattern: "git add*"
+  - pattern: "git commit*"
+  - pattern: "cat *"
+  - pattern: "ls *"
 
 ask:
+  - pattern: "rm -rf*"
   - pattern: "*prisma migrate*"
+  - pattern: "git push*"
 
 deny:
   - pattern: "git push --force*"
   - pattern: "DROP TABLE*"
-  - pattern: "rm -rf*"
+  - paths:
+      - ".env"
+      - "secrets/**"
 """
 
 

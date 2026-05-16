@@ -1,4 +1,4 @@
-"""End-to-end wit_check: structured rules → NL → generic; optional SQLite cache."""
+"""End-to-end wit_check: NL deny probe → structured rules; optional SQLite cache."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 from witsmith.cache_store import cache_get, cache_key, cache_put
 from witsmith.config import confidence_ask_threshold, witsmith_data_dirname
 from witsmith.layout import repo_root_for_wit
-from witsmith.llm_check import generic_fallback_check, nl_deny_check
+from witsmith.llm_check import nl_deny_check
 from witsmith.models import Action, CheckResult
 from witsmith.rule_engine import apply_structured_rules, should_run_nl_deny_check
 from witsmith.wit_file import load_wit, wit_yaml_text
@@ -67,17 +67,8 @@ def run_wit_check(
                 out, {"cache_hit": False, "cache_key": key, "path": "nl"}
             )
 
-    # 2) Structured allow / ask / deny
+    # 2) Structured allow / ask / deny. This is total: an unmatched command asks.
     structured = apply_structured_rules(wit, action, repo_root)
-    if structured is not None:
-        out = _apply_confidence_floor(structured)
-        cache_put(db_path, key, out)
-        return out, {"cache_hit": False, "cache_key": key, "path": "structured"}
-
-    # 3) Generic
-    generic = generic_fallback_check(wit, action, wit_yaml)
-    out = _apply_confidence_floor(generic)
+    out = _apply_confidence_floor(structured)
     cache_put(db_path, key, out)
-    return out, _meta_for_result(
-        out, {"cache_hit": False, "cache_key": key, "path": "generic"}
-    )
+    return out, {"cache_hit": False, "cache_key": key, "path": "structured"}

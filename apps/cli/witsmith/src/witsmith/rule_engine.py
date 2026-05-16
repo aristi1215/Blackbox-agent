@@ -71,13 +71,32 @@ def _describe_rule(rule: Rule) -> str:
     return "rule"
 
 
-def apply_structured_rules(wit: Wit, action: Action, repo_root: Path) -> CheckResult | None:
-    """Return a verdict from pattern/path rules only, or None to defer to LLM."""
+def apply_structured_rules(wit: Wit, action: Action, repo_root: Path) -> CheckResult:
+    """Return a verdict from pattern/path rules only, defaulting to explicit approval."""
 
     cmd = action.command
     cwd = Path(action.cwd)
 
-    # 1) Deny — patterns + paths on command / cwd
+    # 1) Allow — fast path for known-safe commands / cwd.
+    for rule in _iter_structured(wit.allow):
+        if rule.pattern and _command_matches_pattern(cmd, rule.pattern):
+            return CheckResult(
+                decision="allow",
+                reason=rule.reason or f"matched allow {_describe_rule(rule)}",
+                dry_run=f"would run: {cmd}",
+                matched_rule=_describe_rule(rule),
+                confidence=0.9,
+            )
+        if rule.paths and _cwd_matches_path_globs(cwd, repo_root, rule.paths):
+            return CheckResult(
+                decision="allow",
+                reason=rule.reason or f"matched allow {_describe_rule(rule)}",
+                dry_run=f"would run: {cmd}",
+                matched_rule=_describe_rule(rule),
+                confidence=0.85,
+            )
+
+    # 2) Deny — patterns + paths on command / cwd.
     for rule in _iter_structured(wit.deny):
         if rule.pattern and _command_matches_pattern(cmd, rule.pattern):
             return CheckResult(
@@ -99,7 +118,7 @@ def apply_structured_rules(wit: Wit, action: Action, repo_root: Path) -> CheckRe
                 confidence=0.93,
             )
 
-    # 2) Ask
+    # 3) Ask
     for rule in _iter_structured(wit.ask):
         if rule.pattern and _command_matches_pattern(cmd, rule.pattern):
             files_hint = "many files" if "rm" in cmd.lower() else "review recommended"
@@ -119,26 +138,13 @@ def apply_structured_rules(wit: Wit, action: Action, repo_root: Path) -> CheckRe
                 confidence=0.88,
             )
 
-    # 3) Allow
-    for rule in _iter_structured(wit.allow):
-        if rule.pattern and _command_matches_pattern(cmd, rule.pattern):
-            return CheckResult(
-                decision="allow",
-                reason=rule.reason or f"matched allow {_describe_rule(rule)}",
-                dry_run=f"would run: {cmd}",
-                matched_rule=_describe_rule(rule),
-                confidence=0.9,
-            )
-        if rule.paths and _cwd_matches_path_globs(cwd, repo_root, rule.paths):
-            return CheckResult(
-                decision="allow",
-                reason=rule.reason or f"matched allow {_describe_rule(rule)}",
-                dry_run=f"would run: {cmd}",
-                matched_rule=_describe_rule(rule),
-                confidence=0.85,
-            )
-
-    return None
+    return CheckResult(
+        decision="ask",
+        reason="no matching allow rule — explicit approval required",
+        dry_run=f"would run: {cmd}",
+        matched_rule="default:ask",
+        confidence=1.0,
+    )
 
 
 def has_natural_language_deny_rules(wit: Wit) -> bool:

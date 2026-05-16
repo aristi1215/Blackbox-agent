@@ -1,5 +1,7 @@
 # Witsmith starter wit (the contract).
 # Backs ContractCheckInput -> ContractDecision, ContractEvent, ContractAmendment.
+# Witsmith runs ALLOW-LIST by default.
+# Commands not listed under allow require explicit approval.
 version: 1
 repo: my-nextjs-app
 notes:
@@ -11,15 +13,16 @@ notes:
 allow:
 - pattern: npm test
 - pattern: npm run *
-- paths:
-  - src/**
-  - app/**
-  - tests/**
+- pattern: git status
+- pattern: git diff*
+- pattern: git add*
+- pattern: git commit*
+- pattern: cat *
+- pattern: ls *
 ask:
 - pattern: rm -rf*
 - pattern: '*prisma migrate*'
-- paths:
-  - prisma/migrations/**
+- pattern: git push*
 deny:
 - pattern: git push --force*
 - pattern: DROP TABLE*
